@@ -1,3 +1,10 @@
-{ "name": "My Preso", "sections": [
-  { "section" : "presentation" }
-] }
+{
+  "name": "SQL Tricks",
+  "templates": {
+    "default" : "default.tpl",
+    "verbose" : "verbose.tpl"
+  },
+  "sections": [
+    { "section" : "presentation" }
+  ]
+}
