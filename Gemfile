@@ -1,4 +1,3 @@
 source :rubygems
 
-gem 'showoff'
-gem 'gli', '~> 1.3.2'
+gem 'showoff', github: 'puppetlabs/showoff'
