@@ -16,14 +16,15 @@
 !SLIDE
 # Presenting data in a view
 
-!SLIDE
+!SLIDE[tpl=verbose]
 # "Normalize" denormalized data
 
     @@@ SQL
     CREATE VIEW emails AS
-      SELECT users.id, CASCADE(profiles.email, users.email) AS email
+      SELECT user_id, CASCADE(profiles.email, users.email) AS email
       FROM users
-      INNER JOIN profiles ON users.id = profiles.user_id ;
+      INNER JOIN profiles
+      ON users.id = profiles.user_id ;
 
 !SLIDE
 # More stuff about views
