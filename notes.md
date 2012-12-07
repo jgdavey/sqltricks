@@ -1,133 +1,358 @@
-* Constraints
+!SLIDE[tpl=verbose]
 
-** NOT NULL
+# Data integrity is not a feature, it is a requirement.
 
-create table people(
-  id serial primary key
-  name varchar not null
-);
+!SLIDE[tpl=verbose]
 
-or
-
-create_table :people do |t|
-  t.column :name, :string, null: false
-end
+# not null
 
 Nulls short circuit almost every operation to null. Avoid if possible.
 
-** Foreign keys constraints
+    @@@ sql
+    create table people(
+      id serial primary key,
+      name varchar not null
+    );
 
-create table posts(
-  id serial primary key,
-  author_id integer not null references authors
-  body text not null
-);
+    @@@ sql
+    insert into people(name) values(null);
+
+    @@@
+    ERROR:  null value in column "name" violates not-null constraint
+    DETAIL:  Failing row contains (1, null).
+
+!SLIDE[tpl=verbose]
+
+# Foreign keys constraints
 
 Foreign key constraints ensure that you do not have get orphaned records.
 
-** Check constraints
+    @@@ sql
+    create table authors(
+      id serial primary key,
+      name varchar not null
+    );
 
-create table reservations(
-  id serial primary key,
-  room_id integer not null references rooms,
-  start_time timestamp not null,
-  end_time timestamp not null,
-  check (start_time < end_time)
-);
+    create table posts(
+      id serial primary key,
+      author_id integer not null references authors,
+      body text not null
+    );
+
+!SLIDE[tpl=verbose]
+
+    @@@ sql
+    insert into authors(id, name) values(1, 'John');
+    insert into posts(author_id, body) values(1, '...');
+    delete from authors;
+
+    @@@
+    ERROR:  update or delete on table "authors" violates foreign key constraint "posts_author_id_fkey" on table "posts"
+    DETAIL:  Key (id)=(1) is still referenced from table "posts".
+
+!SLIDE[tpl=verbose]
+
+# Check constraints
 
 Arbitrary declarative data constraints
 
-** Unique
+    @@@ sql
+    create table reservations(
+      id serial primary key,
+      start_time timestamp not null,
+      end_time timestamp not null,
+      check (start_time < end_time)
+    );
 
-create table users(
-  id serial primary key,
-  name varchar unique
-);
+    insert into reservations(start_time, end_time) values('2012-12-07 10:00:00', '2012-12-07 09:00:00');
+
+    @@@ 
+    ERROR:  new row for relation "reservations" violates check constraint "reservations_check"
+    DETAIL:  Failing row contains (1, 2012-12-07 10:00:00, 2012-12-07 09:00:00).
+
+!SLIDE[tpl=verbose]
+
+# Unique constraints
 
 Rails' validates_uniqueness_of is not a guarantee. The database is.
 
-** Partial Indexes
+    @@@ sql
+    create table users(
+      id serial primary key,
+      name varchar unique
+    );
 
-create table posts(
-  id serial primary key,
-  body text not null,
-  front_page boolean not null
-);
+    insert into users(name) values('John');
+    insert into users(name) values('John');
 
-create index on posts (front_page) where front_page;
+    @@@
+    ERROR:  duplicate key value violates unique constraint "users_name_key"
+    DETAIL:  Key (name)=(John) already exists.
+
+
+!SLIDE[tpl=verbose]
+
+# Partial Indexes
+
+    @@@ sql
+    create table posts(
+      id serial primary key,
+      body text not null,
+      front_page boolean not null
+    );
+
+    create index on posts (front_page) where front_page;
 
 Could have millions of posts, but only handful of front page posts. Index will only contain rows that are front page and will not be bloated by the millions of old posts.
 
-** Partial unique indexes
+!SLIDE[tpl=verbose]
 
-create table teams(
-  id serial primary key,
-  name varchar not null unique
-);
+# Partial unique indexes
 
-create table players(
-  id serial primary key,
-  team_id integer not null references teams,
-  captain boolean not null,
-  name varchar not null
-);
+    @@@ sql
+    create table teams(
+      id serial primary key,
+      name varchar not null unique
+    );
 
-create unique index on players (team_id) where captain;
+    create table players(
+      id serial primary key,
+      team_id integer not null references teams,
+      captain boolean not null,
+      name varchar not null
+    );
+
+    create unique index on players (team_id) where captain;
 
 This will guarantee there is only one captain per team.
 
-** Functional indexes
+!SLIDE[tpl=verbose]
 
-create table users(
-  id serial primary key,
-  name varchar not null
-);
+    @@@ sql
+    insert into teams(id, name) values(1, 'Bulls');
+    insert into players(team_id, captain, name) values(1, true, 'Michael Jordan');
+    insert into players(team_id, captain, name) values(1, true, 'Scotty Pippen');
 
-create unique index on users (lower(name));
+    @@@
+    ERROR:  duplicate key value violates unique constraint "players_team_id_idx"
+    DETAIL:  Key (team_id)=(1) already exists.
+
+!SLIDE[tpl=verbose]
+
+# Functional indexes
+
+    @@@ sql
+    create table users(
+      id serial primary key,
+      name varchar not null
+    );
+
+    create unique index on users (lower(name));
 
 This will guarantee case-insensitive uniqueness, and will preserve the original case.
 
 An index can be created on the result of a stable expression.
 
-* Richer data modeling
+!SLIDE[tpl=verbose]
 
-** Enum
+# Richer Data Modeling
 
-FIXME -- double check this syntax
+!SLIDE[tpl=verbose]
 
-create enum grade_level('freshman', 'sophomore', 'junior', 'senior', 'graduate');
+# Enum
 
-create table students(
-  id serial primary key,
-  name varchar not null,
-  grade_level grade_level not null
-);
+    @@@ sql
+    create type grade_level as enum ('freshman', 'sophomore', 'junior', 'senior', 'graduate');
 
-Will only store correct values. Will sort by order given in the enum.
+    create table students(
+      id serial primary key,
+      name varchar not null,
+      grade_level grade_level not null
+    );
 
-** hstore
+    insert into students(name, grade_level) values('John', 'freshman');
+    insert into students(name, grade_level) values('Jane', 'senior');
+    insert into students(name, grade_level) values('Kari', 'junior');
 
-TODO
+!SLIDE[tpl=verbose]
 
-** citext
+Database only store values allowed by enumeration
 
-create table users(
-  id serial primary key,
-  name citext not null unique
-);
+    @@@ sql
+    insert into students(name, grade_level) values('Samwise', 'hobbit');
 
-Case-preserving and case insensitive.
+    @@@
+    ERROR:  invalid input value for enum grade_level: "hobbit"
+    LINE 1: ...nto students(name, grade_level) values('Samwise', 'hobbit');
 
-** json
 
-TODO
+!SLIDE[tpl=verbose]
 
-** inet
+Order by will respect order of enumeration
 
-create table logins_attempts(
-  id serial primary key,
-  user_name varchar not null,
-  successful boolean not null,
-  remote_ip inet not null,
-  created_at timestamp not null
-);
+    @@@ sql
+    select * from students order by grade_level;
+
+    @@@
+     id | name | grade_level 
+    ----+------+-------------
+      1 | John | freshman
+      3 | Kari | junior
+      2 | Jane | senior
+    (3 rows)
+
+!SLIDE[tpl=verbose]
+
+# hstore
+
+* Key/value pairs
+* Only strings
+* Indexable
+
+!SLIDE[tpl=verbose]
+
+    @@@ sql
+    create extension hstore;
+
+    create table users(
+      id serial primary key,
+      name citext not null,
+      settings hstore not null 
+    );
+
+    create index on users using gist (settings);
+
+!SLIDE[tpl=verbose]
+
+    @@@sql
+    insert into users(name, settings) values('jack', 'home=>/home/jack, shell=>/bin/bash');
+    insert into users(name, settings) values('josh', 'home=>/home/josh, shell=>/bin/zsh');
+    select * from users where settings -> 'shell' = '/bin/bash';
+
+    @@@
+     id | name |                  settings                  
+    ----+------+--------------------------------------------
+      3 | jack | "home"=>"/home/jack", "shell"=>"/bin/bash"
+    (1 row)
+
+!SLIDE[tpl=verbose]
+
+# Rails support
+
+* Baked into Rails 4
+* Available with gem in Rails 3
+
+# Rails 3 Example
+
+Using Surus gem
+
+    @@@ ruby
+    class User < ActiveRecord::Base
+      serialize :properties, Surus::Hstore::Serializer.new
+    end
+    
+    # Can serialize anything Rails can
+    User.create :properties => { :favorite_color => "green", :results_per_page => 20 }
+    User.create :properties => { :favorite_colors => ["green", "blue", "red"] }
+
+    # Search helpers
+    User.hstore_has_pairs(:properties, "favorite_color" => "green")
+
+!SLIDE[tpl=verbose]
+
+# citext
+
+Case-preserving and case insensitive text
+
+    @@@ sql
+    create extension citext;
+
+    create table users(
+      id serial primary key,
+      name citext not null unique
+    );
+
+!SLIDE[tpl=verbose]
+
+Useful for case insensitive uniqueness
+    
+    @@@ sql
+    insert into users(name) values('John');
+    insert into users(name) values('john');
+
+    @@@
+    ERROR:  duplicate key value violates unique constraint "users_name_key"
+    DETAIL:  Key (name)=(john) already exists.
+
+!SLIDE[tpl=verbose]
+
+Useful for case insensitive searching
+
+    @@@ sql
+    insert into users(name) values('John');
+    select * from users where name = 'john';
+
+    @@@
+     id | name 
+    ----+------
+      1 | John
+    (1 row)
+
+!SLIDE[tpl=verbose]
+
+# JSON
+
+Store validated JSON
+
+    @@@ sql
+    create table documents(
+      id serial primary key,
+      body json not null
+    );
+
+    insert into documents(body) values('{"foo": "bar"}');
+    insert into documents(body) values('invalid json');
+
+    @@@
+    ERROR:  invalid input syntax for type json
+    LINE 1: insert into documents(body) values('invalid json');
+                                               ^
+    DETAIL:  Token "invalid" is invalid.
+    CONTEXT:  JSON data, line 1: invalid...
+
+
+!SLIDE[tpl=verbose]
+
+# inet
+
+IP address data type
+
+    @@@ sql
+    create table login_attempts(
+      id serial primary key,
+      user_name varchar not null,
+      successful boolean not null,
+      remote_ip inet not null,
+      created_at timestamp not null
+    );
+
+    insert into login_attempts(user_name, successful, remote_ip, created_at) values('jack', false, '10.15.0.1', now());
+    insert into login_attempts(user_name, successful, remote_ip, created_at) values('jack', false, '300.1.1.1', now());
+
+    @@@
+    ERROR:  invalid input syntax for type inet: "300.1.1.1"
+    LINE 1: ...ful, remote_ip, created_at) values('jack', false, '300.1.1.1...
+
+!SLIDE[tpl=verbose]
+
+Advanced functions such as subnet searching
+
+    @@@ sql
+    insert into login_attempts(user_name, successful, remote_ip, created_at) values('jack', false, '10.15.0.2', now());
+    select * from login_attempts where '10.15.0.0/16' >> remote_ip;
+
+    @@@
+     id | user_name | successful | remote_ip |         created_at         
+    ----+-----------+------------+-----------+----------------------------
+      2 | jack      | f          | 10.15.0.2 | 2012-12-06 19:20:33.318967
+    (1 row)

@@ -1,21 +1,28 @@
 !SLIDE
 # Indexes
 
-!SLIDE
+!SLIDE[tpl=verbose]
 # Unique
 
-    @@@ SQL
+Rails' validates\_uniqueness\_of is not a guarantee. The database is.
+
+    @@@ sql
     create table users(
       id serial primary key,
       name varchar unique
     );
 
-Rails' `validates_uniqueness_of` is not a guarantee. The database is.
+    insert into users(name) values('John');
+    insert into users(name) values('John');
 
-!SLIDE
+    ERROR:  duplicate key value violates unique
+      constraint "users_name_key"
+    DETAIL:  Key (name)=(John) already exists.
+
+!SLIDE[tpl=verbose]
 # Partial Indexes
 
-    @@@ SQL
+    @@@ sql
     create table posts(
       id serial primary key,
       body text not null,
@@ -24,15 +31,12 @@ Rails' `validates_uniqueness_of` is not a guarantee. The database is.
 
     create index on posts (front_page) where front_page;
 
-Could have millions of posts, but only handful of front page posts.
+Could have millions of posts, but only handful of front page posts. Index will only contain rows that are front page and will not be bloated by the millions of old posts.
 
-Index will only contain rows that are front page and will not be bloated
-by the millions of old posts.
-
-!SLIDE
+!SLIDE[tpl=verbose]
 # Partial unique indexes
 
-    @@@ SQL
+    @@@ sql
     create table teams(
       id serial primary key,
       name varchar not null unique
@@ -49,10 +53,23 @@ by the millions of old posts.
 
 This will guarantee there is only one captain per team.
 
-!SLIDE
+!SLIDE[tpl=verbose]
+
+    @@@ sql
+    insert into teams(id, name) values(1, 'Bulls');
+    insert into players(team_id, captain, name) values(
+      1, true, 'Michael Jordan');
+    insert into players(team_id, captain, name) values(
+      1, true, 'Scotty Pippen');
+
+    ERROR:  duplicate key value violates unique
+      constraint "players_team_id_idx"
+    DETAIL:  Key (team_id)=(1) already exists.
+
+!SLIDE[tpl=verbose]
 # Functional indexes
 
-    @@@ SQL
+    @@@ sql
     create table users(
       id serial primary key,
       name varchar not null
